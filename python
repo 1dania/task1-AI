@@ -1,33 +1,37 @@
 import tensorflow as tf
 import numpy as np
-from PIL import Image
-import sys
+from PIL import Image, ImageOps
+import sys, os
 
-# تحميل النموذج
-model = tf.keras.models.load_model("keras_model.h5")
+MODEL_PATH = "tf_model.h5"
+LABELS_PATH = "labels.txt"
+IMG_SIZE = 224
 
-# تحميل الفئات
-with open("labels.txt", "r") as f:
-    labels = [line.strip() for line in f.readlines()]
+def load_model_and_labels():
+    model = tf.keras.models.load_model(MODEL_PATH)
+    with open(LABELS_PATH, "r") as f:
+        labels = [line.strip() for line in f.readlines()]
+    return model, labels
 
-# دالة لتحويل الصورة لمصفوفة جاهزة للنموذج
 def prepare_image(image_path):
-    img = Image.open(image_path).resize((224, 224))
-    img_array = np.array(img).astype("float32") / 255.0
-    img_array = np.expand_dims(img_array, axis=0)
-    return img_array
+    img = Image.open(image_path).convert("RGB")
+    img = ImageOps.fit(img, (IMG_SIZE, IMG_SIZE), Image.Resampling.LANCZOS)
+    arr = np.asarray(img).astype("float32") / 255.0
+    return np.expand_dims(arr, axis=0)
 
-# مسار الصورة من سطر الأوامر
-if len(sys.argv) < 2:
-    print("يرجى تحديد مسار الصورة: python predict_image.py image.jpg")
-    exit()
+def main():
+    if len(sys.argv) < 2:
+        print("❌ Usage: python predict_image.py <image_path>")
+        sys.exit(1)
+    img_path = sys.argv[1]
+    if not os.path.exists(img_path):
+        print("❌ File not found:", img_path)
+        sys.exit(1)
+    model, labels = load_model_and_labels()
+    inp = prepare_image(img_path)
+    preds = model.predict(inp)[0]
+    idx = np.argmax(preds)
+    print(f"✔️ Prediction: {labels[idx]}  ({preds[idx]*100:.2f}%)")
 
-image_path = sys.argv[1]
-input_image = prepare_image(image_path)
-
-# التنبؤ
-prediction = model.predict(input_image)[0]
-predicted_index = np.argmax(prediction)
-predicted_label = labels[predicted_index]
-
-print(f"✔️ التنبؤ: {predicted_label} (النسبة: {prediction[predicted_index]*100:.2f}%)")
+if name == "__main__":
+    main()
